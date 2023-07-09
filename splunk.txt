@@ -1,0 +1,87 @@
+Splunk Query
+
+ 
+
+index=k8_bm* NOT(index=k8*dev OR index=k8*test)   uri="http*" execution_time earliest="-20m"
+
+| eval Not_Ok=
+
+if(match(_raw,"404::Not::Found"),0,
+
+if(match(_raw,"jeopardyId"),0,
+
+if(match(_raw,"504 Gateway Time-out"),1,
+
+if(match(_raw,"http_status_code_sb=50*"),1,
+
+if(match(_raw,"BAD_REQUEST"),1,
+
+if(match(_raw,"http_status_code_sb=-1"),1,
+
+0))))))
+
+| where Not_Ok=1
+
+| stats count(uri) as TotalCount sum(Not_Ok) as ErrorCount by uri
+
+| eval ErrorPercentage=round(ErrorCount/TotalCount*100,2)
+
+| rename TotalCount as "Total Requests"
+
+| rename ErrorCount as "Errored Requests"
+
+| table uri "Total Requests" "Errored Requests" ErrorPercentage
+
+
+
+
+Here is another query to look for specific error pattern in the logs and get the count of it
+
+ 
+
+index=abc
+
+|rex "logmessage=(?<logmessage>.*)"
+
+| eval logmessage=substr(logmessage,1,1000)
+
+| eval Error_Category_CO=
+
+if(match(_raw,"500::Internal::Server"),"Server Errors",
+
+if(match(_raw,"500 INTERNAL_SERVER_ERROR"),"Server Errors",
+
+if(match(_raw,"502::Bad::Gateway"),"Server Errors",
+
+if(match(_raw,"504::Gateway::Timeout"),"Server Errors",
+
+if(match(_raw,"404::Not::Found"),"404 Not Found",
+
+if(match(_raw,"400::Bad::Request"),"Bad Request",
+
+if(match(_raw,"BAD_REQUEST"),"Bad Request",
+
+if(match(_raw,"422::Unprocessable::Entity"),"422 Unprocessable Entity",
+
+if(match(_raw,"Payload::Too::Large"),"Payload Too Large",
+
+if(match(_raw,"Exception has occurred in initProcess"),"Exception has occurred in initProcess",
+
+if(match(_raw,"com.fasterxml.jackson.core.JsonParseException"),"JsonParseException",
+
+if(match(_raw,"java.lang.IndexOutOfBoundsException"),"java.lang.IndexOutOfBoundsException",
+
+if(match(_raw,"java.lang.StringIndexOutOfBoundsException"),"java.lang.StringIndexOutOfBoundsException",
+
+if(match(_raw,"java.net.SocketTimeoutException"),"java.net.SocketTimeoutException",
+
+if(match(_raw,"java.lang.NullPointerException"),"java.lang.NullPointerException",
+
+if(match(_raw,"Record not found"),"Record not found",
+
+"OTHER"))))))))))))))))
+
+| stats count by Error_Category_CO
+
+| sort count desc
+
